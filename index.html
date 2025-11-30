@@ -4,8 +4,11 @@
   <meta charset="UTF-8" />
   <title>AM Lernkarten</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.webmanifest" />
-  <meta name="theme-color" content="#0f766e" />
+  <meta name="theme-color" content="#0f766e">
+
   <style>
     :root {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -24,752 +27,462 @@
       max-width: 960px;
       padding: 1rem;
     }
-    h1, h2, h3 {
-      margin-top: 0.5rem;
-      margin-bottom: 0.5rem;
-    }
+    h1, h2, h3 { margin: .5rem 0; }
     .card {
       background: #020617;
-      border-radius: 0.75rem;
+      border-radius: .75rem;
       padding: 1rem;
       margin-bottom: 1rem;
       border: 1px solid #1f2937;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-    }
-    .row {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    input[type="text"], input[type="date"], textarea, select {
-      background: #020617;
-      color: #e5e7eb;
-      border-radius: 0.5rem;
-      border: 1px solid #4b5563;
-      padding: 0.5rem;
-      font: inherit;
-      min-width: 0;
-    }
-    textarea {
-      width: 100%;
-      min-height: 80px;
-      resize: vertical;
     }
     button {
       border-radius: 999px;
       border: 1px solid #0d9488;
       background: #0f766e;
       color: white;
-      padding: 0.4rem 0.9rem;
+      padding: .4rem .9rem;
       font: inherit;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
     }
     button.secondary {
       background: transparent;
       border-color: #4b5563;
       color: #e5e7eb;
     }
-    button.danger {
-      background: #b91c1c;
-      border-color: #b91c1c;
+    button.small { padding: .3rem .6rem; font-size: .8rem; }
+    input[type="text"], input[type="date"], textarea {
+      background: #020617;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+      border-radius: .5rem;
+      padding: .5rem;
+      font: inherit;
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: default;
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
     }
+    .row { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
     .badge {
-      display: inline-block;
-      padding: 0.1rem 0.5rem;
-      border-radius: 999px;
       background: #111827;
-      font-size: 0.75rem;
+      padding: .2rem .6rem;
+      border-radius: 999px;
       border: 1px solid #374151;
+      font-size: .75rem;
     }
     .deck-item {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0;
+      padding: .4rem 0;
       border-bottom: 1px solid #111827;
-    }
-    .deck-main {
-      cursor: pointer;
-      flex: 1;
-    }
-    .muted {
-      color: #9ca3af;
-      font-size: 0.85rem;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.15rem 0.6rem;
-      border-radius: 999px;
-      border: 1px solid #1f2937;
-      font-size: 0.75rem;
-      gap: 0.25rem;
-    }
-    .mt-sm { margin-top: 0.5rem; }
-    .mt { margin-top: 1rem; }
-    .mb { margin-bottom: 1rem; }
-    .flex-between {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.5rem;
       align-items: center;
     }
-    .chip-group {
-      display: flex;
-      gap: 0.25rem;
-      flex-wrap: wrap;
-    }
+    .deck-main { cursor: pointer; flex: 1; }
     .fc-card {
       min-height: 150px;
-      border-radius: 0.75rem;
       border: 1px dashed #4b5563;
-      padding: 1rem;
+      border-radius: .75rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      text-align: center;
+      padding: 1rem;
       cursor: pointer;
       user-select: none;
     }
-    .fc-label {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #9ca3af;
-      margin-bottom: 0.3rem;
-    }
-    .fc-text {
-      font-size: 1.15rem;
-      font-weight: 500;
-      white-space: pre-wrap;
-    }
-    .tag {
-      font-size: 0.7rem;
-      border-radius: 999px;
-      padding: 0.1rem 0.4rem;
-      background: #1f2937;
-      color: #9ca3af;
-    }
-    .small {
-      font-size: 0.8rem;
-    }
-    .danger-text {
-      color: #f87171;
-    }
-    @media (max-width: 600px) {
-      .flex-responsive {
-        flex-direction: column;
-        align-items: stretch;
-      }
-    }
+    .fc-label { font-size: .75rem; color: #9ca3af; text-transform: uppercase; }
+    .fc-text { font-size: 1.2rem; white-space: pre-wrap; }
+    .muted { color: #9ca3af; font-size: .85rem; }
   </style>
 </head>
+
 <body>
-  <div class="app">
-    <h1>AM Lernkarten</h1>
-    <p class="muted small">
-      Lerne deine Karteikarten für Additive Fertigung. Mehrere Stapel, Klausurdatum und Lernplan – alles lokal im Browser gespeichert.
-    </p>
+<div class="app">
 
-<div id="view-deck-list" class="card">
-  <div class="flex-between">
-    <h2>Stapel</h2>
-    <button id="btn-export" class="secondary small">Backup exportieren</button>
+  <h1>AM Lernkarten</h1>
+  <p class="muted">Lerne deine Karteikarten für Additive Fertigung. Jetzt auch mit TSV-Import.</p>
+
+  <!-- =========================
+       VIEW: DECK LIST
+  =============================-->
+  <div id="view-deck-list" class="card">
+    <div class="flex-between">
+      <h2>Stapel</h2>
+      <button id="btn-export" class="secondary small">Backup exportieren</button>
+    </div>
+
+    <!-- Neues Deck -->
+    <div class="row mt-sm">
+      <input id="new-deck-name" type="text" placeholder="Neuer Stapelname" style="flex:1" />
+      <button id="btn-add-deck">Anlegen</button>
+    </div>
+
+    <!-- TSV Import -->
+    <div class="row mt-sm">
+      <input id="file-import" type="file" accept=".tsv,.txt" />
+      <button id="btn-import" class="secondary small">TSV-Deck importieren</button>
+    </div>
+
+    <div id="deck-list" class="mt-sm"></div>
   </div>
 
-  <div class="row flex-responsive mt-sm">
-    <input id="new-deck-name" type="text" placeholder="Neuer Stapelname (z.B. Pulver & Draht)" style="flex:1" />
-    <button id="btn-add-deck">Stapel anlegen</button>
+  <!-- =========================
+       VIEW: DECK DETAIL
+  =============================-->
+  <div id="view-deck-detail" class="card" style="display:none;">
+    <button id="btn-back" class="secondary small">⬅ Zurück</button>
+
+    <h2>Stapel bearbeiten</h2>
+    <input id="deck-name-edit" type="text" class="mt-sm" />
+
+    <div class="row mt-sm">
+      <label>Klausurdatum:</label>
+      <input id="deck-exam-date" type="date" />
+    </div>
+
+    <div class="card mt" style="background:#0f172a;">
+      <h3>Lernplan</h3>
+      <div id="plan-info" class="muted"></div>
+    </div>
+
+    <h3 class="mt">Karten <span id="card-count-badge" class="badge"></span></h3>
+    <div id="card-list"></div>
+
+    <details class="mt">
+      <summary>Karte hinzufügen</summary>
+      <textarea id="new-card-front" placeholder="Vorderseite"></textarea>
+      <textarea id="new-card-back" placeholder="Rückseite"></textarea>
+      <button id="btn-add-card" class="mt-sm">Speichern</button>
+    </details>
+
+    <div class="row mt">
+      <button id="btn-start-study">Lernen</button>
+      <button id="btn-delete-deck" class="secondary small">Stapel löschen</button>
+    </div>
   </div>
 
-  <div class="row flex-responsive mt-sm">
-    <input id="file-import" type="file" accept=".tsv,.txt" />
-    <button id="btn-import" class="secondary small">TSV-Deck importieren</button>
+  <!-- =========================
+       VIEW: STUDY MODE
+  =============================-->
+  <div id="view-study" class="card" style="display:none;">
+    <button id="btn-exit-study" class="secondary small">⬅ Beenden</button>
+
+    <div id="study-progress" class="muted"></div>
+
+    <div id="study-card" class="fc-card mt">
+      <div>
+        <div id="study-face-label" class="fc-label">Frage</div>
+        <div id="study-text" class="fc-text"></div>
+      </div>
+    </div>
+
+    <div class="row mt">
+      <button id="btn-toggle-face">Antwort anzeigen</button>
+      <button id="btn-next" class="secondary">Nächste</button>
+    </div>
   </div>
 
-  <div id="deck-list" class="mt-sm"></div>
-
-  <p class="muted small mt-sm">
-    Tipp: Du kannst hier die von mir erzeugten <code>.tsv</code>-Dateien (z.B. <code>AM_Complete_Deck.tsv</code>) importieren.
-    Jede Datei wird als eigener Stapel angelegt.
-  </p>
 </div>
 
+<!-- ============================================================
+     JAVASCRIPT LOGIK
+===============================================================-->
+<script>
+  /* === Globale Variablen === */
+  const STORAGE_KEY = "am_flashcards_v1";
+  let state = loadState();
+  let currentDeckId = null;
 
-    <div id="view-deck-detail" class="card" style="display:none;">
-      <div class="flex-between mb">
-        <button id="btn-back" class="secondary small">← Zurück</button>
-        <span id="deck-detail-name-tag" class="badge"></span>
-      </div>
+  let study = {
+    deckId: null,
+    index: 0,
+    showBack: false,
+    order: []
+  };
 
-      <h2>Stapel-Details</h2>
-      <div class="row flex-responsive">
-        <input id="deck-name-edit" type="text" />
-        <div class="row" style="align-items:center;">
-          <label for="deck-exam-date" class="small">Klausurdatum:</label>
-          <input id="deck-exam-date" type="date" />
-        </div>
-      </div>
+  /* === Hilfsfunktionen === */
+  function uuid() {
+    return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+  }
 
-      <div class="mt card" style="background:#020617; border-color:#111827;">
-        <h3>Lernplan</h3>
-        <div id="plan-info" class="small"></div>
-      </div>
-
-      <div class="mt">
-        <div class="flex-between">
-          <h3>Karten</h3>
-          <span id="card-count-badge" class="badge"></span>
-        </div>
-        <div id="card-list" class="mt-sm small"></div>
-
-        <details class="mt">
-          <summary style="cursor:pointer;">Neue Karte hinzufügen</summary>
-          <div class="mt-sm">
-            <label class="small">Vorderseite (Frage/Begriff)</label>
-            <textarea id="new-card-front"></textarea>
-            <label class="small">Rückseite (Antwort/Erklärung)</label>
-            <textarea id="new-card-back"></textarea>
-            <button id="btn-add-card" class="mt-sm">Karte speichern</button>
-          </div>
-        </details>
-      </div>
-
-      <div class="mt flex-between">
-        <button id="btn-start-study">Lernen starten</button>
-        <button id="btn-delete-deck" class="danger small">Stapel löschen</button>
-      </div>
-    </div>
-
-    <div id="view-study" class="card" style="display:none;">
-      <div class="flex-between mb">
-        <button id="btn-exit-study" class="secondary small">← Zurück</button>
-        <span id="study-deck-name" class="badge"></span>
-      </div>
-      <div class="small muted" id="study-progress"></div>
-      <div id="study-card" class="mt fc-card">
-        <div>
-          <div class="fc-label" id="study-face-label">Frage</div>
-          <div class="fc-text" id="study-text"></div>
-        </div>
-      </div>
-      <div class="row mt">
-        <button id="btn-toggle-face">Antwort anzeigen</button>
-        <button id="btn-next" class="secondary">Nächste Karte</button>
-      </div>
-      <p class="small muted mt-sm">
-        Tippe auf die Karte, um ebenfalls Vorder-/Rückseite zu wechseln.
-      </p>
-    </div>
-  </div>
-
-  <script>
-    // --- Datenmodell & Storage ---
-    const STORAGE_KEY = "am_flashcards_v1";
-
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return { decks: [] };
-        return JSON.parse(raw);
-      } catch (e) {
-        console.error("Fehler beim Laden des Zustands:", e);
-        return { decks: [] };
-      }
+  function loadState() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { decks: [] };
+    } catch {
+      return { decks: [] };
     }
+  }
 
-    function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      render();
-    }
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    render();
+  }
 
-    function uuid() {
-      return crypto.randomUUID
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2) + Date.now().toString(36);
-    }
+  function getDeck() {
+    return state.decks.find(d => d.id === currentDeckId);
+  }
 
-    let state = loadState();
-    let currentDeckId = null;
-    let study = {
-      deckId: null,
-      index: 0,
-      showBack: false,
-      order: []
+  function computePlan(deck) {
+    if (!deck.examDate || deck.cards.length === 0) return null;
+    const today = new Date();
+    const exam = new Date(deck.examDate);
+    const diff = Math.ceil((exam - today) / (1000 * 60 * 60 * 24));
+    if (diff <= 0) return { daysLeft: diff };
+    return {
+      daysLeft: diff,
+      cardsPerDay: Math.ceil(deck.cards.length / diff)
     };
-
-    // --- Hilfsfunktionen ---
-    function getCurrentDeck() {
-      return state.decks.find(d => d.id === currentDeckId) || null;
-    }
-
-    function formatDate(dateStr) {
-      if (!dateStr) return null;
-      const d = new Date(dateStr + "T00:00:00");
-      if (Number.isNaN(d.getTime())) return null;
-      return d.toLocaleDateString("de-DE");
-    }
-
-    function computePlan(deck) {
-      if (!deck.examDate || !deck.cards.length) return null;
-      const today = new Date();
-      const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const exam = new Date(deck.examDate + "T00:00:00");
-      const diffMs = exam - todayMid;
-      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays <= 0) return { daysLeft: diffDays, cardsPerDay: null };
-      const cardsPerDay = Math.ceil(deck.cards.length / diffDays);
-      return { daysLeft: diffDays, cardsPerDay };
-    }
-
-    // --- UI-Rendering ---
-    const viewDeckList = document.getElementById("view-deck-list");
-    const viewDeckDetail = document.getElementById("view-deck-detail");
-    const viewStudy = document.getElementById("view-study");
-
-    const deckListEl = document.getElementById("deck-list");
-    const newDeckNameInput = document.getElementById("new-deck-name");
-    const btnAddDeck = document.getElementById("btn-add-deck");
-    const btnExport = document.getElementById("btn-export");
-    const fileImport = document.getElementById("file-import");
-    const btnImport = document.getElementById("btn-import");
-
-    const deckDetailNameTag = document.getElementById("deck-detail-name-tag");
-    const deckNameEdit = document.getElementById("deck-name-edit");
-    const deckExamDate = document.getElementById("deck-exam-date");
-    const planInfo = document.getElementById("plan-info");
-    const cardCountBadge = document.getElementById("card-count-badge");
-    const cardList = document.getElementById("card-list");
-    const newCardFront = document.getElementById("new-card-front");
-    const newCardBack = document.getElementById("new-card-back");
-    const btnAddCard = document.getElementById("btn-add-card");
-    const btnDeleteDeck = document.getElementById("btn-delete-deck");
-    const btnBack = document.getElementById("btn-back");
-    const btnStartStudy = document.getElementById("btn-start-study");
-
-    const studyDeckName = document.getElementById("study-deck-name");
-    const studyProgress = document.getElementById("study-progress");
-    const studyFaceLabel = document.getElementById("study-face-label");
-    const studyText = document.getElementById("study-text");
-    const studyCard = document.getElementById("study-card");
-    const btnToggleFace = document.getElementById("btn-toggle-face");
-    const btnNext = document.getElementById("btn-next");
-    const btnExitStudy = document.getElementById("btn-exit-study");
-
-    function renderDeckList() {
-      if (!state.decks.length) {
-        deckListEl.innerHTML = `<p class="muted small">Noch keine Stapel angelegt. Lege oben deinen ersten Stapel an.</p>`;
-        return;
-      }
-      deckListEl.innerHTML = "";
-      state.decks.forEach(deck => {
-        const div = document.createElement("div");
-        div.className = "deck-item";
-
-        const main = document.createElement("div");
-        main.className = "deck-main";
-        main.onclick = () => {
-          currentDeckId = deck.id;
-          render();
-        };
-
-        const title = document.createElement("div");
-        title.textContent = deck.name || "Unbenannter Stapel";
-
-        const meta = document.createElement("div");
-        meta.className = "muted small";
-
-        const parts = [];
-        parts.push(`${deck.cards.length} Karten`);
-
-        if (deck.examDate) {
-          const plan = computePlan(deck);
-          let s = `Klausur: ${formatDate(deck.examDate)}`;
-          if (plan) {
-            if (plan.daysLeft > 0 && plan.cardsPerDay) {
-              s += ` • Plan: ~${plan.cardsPerDay} Karten/Tag (${plan.daysLeft} Tage)`;
-            } else if (plan.daysLeft === 0) {
-              s += ` • Heute ist Klausurtag`;
-            } else if (plan.daysLeft < 0) {
-              s += ` • Klausur vorbei`;
-            }
-          }
-          parts.push(s);
-        }
-
-        meta.textContent = parts.join(" | ");
-
-        main.appendChild(title);
-        main.appendChild(meta);
-
-        const actions = document.createElement("div");
-        actions.className = "chip-group";
-
-        const btnStudy = document.createElement("button");
-        btnStudy.textContent = "Lernen";
-        btnStudy.className = "small";
-        btnStudy.onclick = (e) => {
-          e.stopPropagation();
-          startStudy(deck.id);
-        };
-
-        const del = document.createElement("button");
-        del.textContent = "✕";
-        del.className = "secondary small";
-        del.onclick = (e) => {
-          e.stopPropagation();
-          if (confirm(`Stapel "${deck.name}" wirklich löschen?`)) {
-            state.decks = state.decks.filter(d => d.id !== deck.id);
-            if (currentDeckId === deck.id) currentDeckId = null;
-            saveState();
-          }
-        };
-
-        actions.appendChild(btnStudy);
-        actions.appendChild(del);
-
-        div.appendChild(main);
-        div.appendChild(actions);
-        deckListEl.appendChild(div);
-      });
-    }
-
-    function renderDeckDetail() {
-      const deck = getCurrentDeck();
-      if (!deck) return;
-
-      deckDetailNameTag.textContent = deck.name || "Stapel";
-      deckNameEdit.value = deck.name || "";
-      deckExamDate.value = deck.examDate || "";
-
-      const plan = computePlan(deck);
-      let html = "";
-      html += `<div>Karten insgesamt: <strong>${deck.cards.length}</strong></div>`;
-      if (deck.examDate) {
-        html += `<div>Klausurdatum: <strong>${formatDate(deck.examDate)}</strong></div>`;
-        if (plan) {
-          if (plan.daysLeft > 0 && plan.cardsPerDay) {
-            html += `<div>Verbleibende Tage: <strong>${plan.daysLeft}</strong></div>`;
-            html += `<div>Empfehlung: ca. <strong>${plan.cardsPerDay}</strong> Karten/Tag</div>`;
-          } else if (plan.daysLeft === 0) {
-            html += `<div class="danger-text">Heute ist Klausurtag – go, go, go 💪</div>`;
-          } else if (plan.daysLeft < 0) {
-            html += `<div class="muted">Klausur liegt bereits in der Vergangenheit.</div>`;
-          }
-        }
-      } else {
-        html += `<div class="muted small">Setze ein Klausurdatum, um einen Lernplan zu berechnen.</div>`;
-      }
-      planInfo.innerHTML = html;
-
-      cardCountBadge.textContent = `${deck.cards.length} Karten`;
-
-      if (!deck.cards.length) {
-        cardList.innerHTML = `<p class="muted small">Noch keine Karten in diesem Stapel.</p>`;
-      } else {
-        cardList.innerHTML = "";
-        deck.cards.forEach((card, index) => {
-          const row = document.createElement("div");
-          row.className = "mt-sm";
-
-          const top = document.createElement("div");
-          top.className = "small";
-          top.innerHTML = `<strong>${index + 1}.</strong> ${card.front}`;
-
-          const bottom = document.createElement("div");
-          bottom.className = "small muted";
-          bottom.textContent = card.back.length > 120
-            ? card.back.slice(0, 120) + "…"
-            : card.back;
-
-          const meta = document.createElement("div");
-          meta.className = "chip-group mt-sm";
-
-          const seen = document.createElement("span");
-          seen.className = "tag";
-          seen.textContent = `gesehen: ${card.timesSeen || 0}x`;
-          meta.appendChild(seen);
-
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "Löschen";
-          delBtn.className = "secondary small";
-          delBtn.onclick = () => {
-            if (confirm("Diese Karte wirklich löschen?")) {
-              deck.cards.splice(index, 1);
-              saveState();
-            }
-          };
-          meta.appendChild(delBtn);
-
-          row.appendChild(top);
-          row.appendChild(bottom);
-          row.appendChild(meta);
-
-          cardList.appendChild(row);
-        });
-      }
-    }
-
-    function renderStudyView() {
-      const deck = state.decks.find(d => d.id === study.deckId);
-      if (!deck) return;
-
-      studyDeckName.textContent = deck.name || "Stapel";
-      const total = study.order.length;
-      if (!total) {
-        studyProgress.textContent = "Keine Karten im Stapel.";
-        studyText.textContent = "";
-        btnToggleFace.disabled = true;
-        btnNext.disabled = true;
-        return;
-      }
-      const currentPos = study.index + 1;
-      studyProgress.textContent = `Karte ${currentPos} von ${total}`;
-      btnToggleFace.disabled = false;
-      btnNext.disabled = false;
-
-      const cardIndex = study.order[study.index];
-      const card = deck.cards[cardIndex];
-
-      studyFaceLabel.textContent = study.showBack ? "Antwort" : "Frage";
-      studyText.textContent = study.showBack ? card.back : card.front;
-    }
-
-    function render() {
-      if (study.deckId) {
-        viewDeckList.style.display = "none";
-        viewDeckDetail.style.display = "none";
-        viewStudy.style.display = "block";
-        renderStudyView();
-      } else if (currentDeckId) {
-        viewDeckList.style.display = "none";
-        viewDeckDetail.style.display = "block";
-        viewStudy.style.display = "none";
-        renderDeckDetail();
-      } else {
-        viewDeckList.style.display = "block";
-        viewDeckDetail.style.display = "none";
-        viewStudy.style.display = "none";
-        renderDeckList();
-      }
-    }
-
-function importTSV(text, filename) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-  if (!lines.length) {
-    alert("Die Datei scheint leer zu sein.");
-    return;
   }
 
-  let startIndex = 0;
-  const firstParts = lines[0].split("\t");
-  if (
-    firstParts.length >= 2 &&
-    /front|vorder/i.test(firstParts[0]) &&
-    /back|r.ckseite/i.test(firstParts[1])
-  ) {
-    // erste Zeile ist Header (Front/Back)
-    startIndex = 1;
-  }
+  /* ================================
+     TSV-Import
+  =================================*/
+  function importTSV(text, filename) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+    if (lines.length === 0) return alert("Die Datei ist leer.");
 
-  const cards = [];
-  for (let i = startIndex; i < lines.length; i++) {
-    const parts = lines[i].split("\t");
-    if (parts.length < 2) continue;
-    const front = parts[0].trim();
-    const back = parts[1].trim();
-    if (!front || !back) continue;
-    cards.push({
-      id: uuid(),
-      front,
-      back,
-      lastReviewed: null,
-      timesSeen: 0
-    });
-  }
+    let start = 0;
+    const header = lines[0].split("\t");
+    if (/front/i.test(header[0]) && /back|r.ckseite/i.test(header[1])) start = 1;
 
-  if (!cards.length) {
-    alert("Es wurden keine gültigen Karten (Front/Back) gefunden.");
-    return;
-  }
-
-  const baseName = filename.replace(/\.[^.]+$/, "");
-  const deckName = baseName || "Importiertes Deck";
-
-  state.decks.push({
-    id: uuid(),
-    name: deckName,
-    examDate: "",
-    cards
-  });
-
-  saveState();
-  alert(`Deck "${deckName}" mit ${cards.length} Karten importiert.`);
-}
-
-
-    // --- Aktionen ---
-    btnAddDeck.addEventListener("click", () => {
-      const name = newDeckNameInput.value.trim();
-      if (!name) return;
-      state.decks.push({
+    const cards = [];
+    for (let i = start; i < lines.length; i++) {
+      const [front, back] = lines[i].split("\t");
+      if (!front || !back) continue;
+      cards.push({
         id: uuid(),
-        name,
-        examDate: "",
-        cards: []
-      });
-      newDeckNameInput.value = "";
-      saveState();
-    });
-
-   btnImport.addEventListener("click", () => {
-     if (!fileImport.files || !fileImport.files.length) {
-       alert("Bitte zuerst eine .tsv-Datei auswählen.");
-     return;
-     }
-     const file = fileImport.files[0];
-     const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
-      importTSV(text, file.name);
-      fileImport.value = ""; // Auswahl zurücksetzen
-      };
-      reader.readAsText(file, "utf-8");
-   });
-
-
-    btnExport.addEventListener("click", () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "am_flashcards_backup.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    deckNameEdit.addEventListener("input", () => {
-      const deck = getCurrentDeck();
-      if (!deck) return;
-      deck.name = deckNameEdit.value;
-      saveState();
-    });
-
-    deckExamDate.addEventListener("change", () => {
-      const deck = getCurrentDeck();
-      if (!deck) return;
-      deck.examDate = deckExamDate.value || "";
-      saveState();
-    });
-
-    btnAddCard.addEventListener("click", () => {
-      const deck = getCurrentDeck();
-      if (!deck) return;
-      const front = newCardFront.value.trim();
-      const back = newCardBack.value.trim();
-      if (!front || !back) return;
-      deck.cards.push({
-        id: uuid(),
-        front,
-        back,
+        front: front.trim(),
+        back: back.trim(),
         lastReviewed: null,
         timesSeen: 0
       });
-      newCardFront.value = "";
-      newCardBack.value = "";
-      saveState();
-    });
-
-    btnDeleteDeck.addEventListener("click", () => {
-      const deck = getCurrentDeck();
-      if (!deck) return;
-      if (confirm(`Stapel "${deck.name}" wirklich löschen?`)) {
-        state.decks = state.decks.filter(d => d.id !== deck.id);
-        currentDeckId = null;
-        saveState();
-      }
-    });
-
-    btnBack.addEventListener("click", () => {
-      currentDeckId = null;
-      render();
-    });
-
-    function startStudy(deckId) {
-      const deck = state.decks.find(d => d.id === deckId);
-      if (!deck || !deck.cards.length) return;
-      study.deckId = deck.id;
-      study.index = 0;
-      study.showBack = false;
-      study.order = deck.cards.map((_, i) => i);
-      // Shuffle
-      for (let i = study.order.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [study.order[i], study.order[j]] = [study.order[j], study.order[i]];
-      }
-      render();
     }
 
-    btnStartStudy.addEventListener("click", () => {
-      const deck = getCurrentDeck();
-      if (!deck) return;
-      startStudy(deck.id);
+    if (!cards.length) return alert("Keine gültigen Karten gefunden.");
+
+    const deckName = filename.replace(/\.[^.]+$/, "");
+    state.decks.push({
+      id: uuid(),
+      name: deckName,
+      examDate: "",
+      cards
     });
 
-    btnExitStudy.addEventListener("click", () => {
-      study.deckId = null;
-      render();
-    });
+    saveState();
+    alert(`Deck "${deckName}" importiert (${cards.length} Karten).`);
+  }
 
-    btnToggleFace.addEventListener("click", () => {
-      const deck = state.decks.find(d => d.id === study.deckId);
-      if (!deck) return;
-      const cardIndex = study.order[study.index];
-      const card = deck.cards[cardIndex];
-      if (!study.showBack) {
-        card.timesSeen = (card.timesSeen || 0) + 1;
-        card.lastReviewed = new Date().toISOString();
-        saveState();
-      }
-      study.showBack = !study.showBack;
+  /* ================================
+     Rendering
+  =================================*/
+  function render() {
+    const vList = document.getElementById("view-deck-list");
+    const vDetail = document.getElementById("view-deck-detail");
+    const vStudy = document.getElementById("view-study");
+
+    if (study.deckId) {
+      vList.style.display = "none";
+      vDetail.style.display = "none";
+      vStudy.style.display = "block";
       renderStudyView();
-    });
-
-    btnNext.addEventListener("click", () => {
-      const deck = state.decks.find(d => d.id === study.deckId);
-      if (!deck) return;
-      if (!deck.cards.length) return;
-      study.showBack = false;
-      study.index++;
-      if (study.index >= study.order.length) {
-        // Wieder von vorne
-        study.index = 0;
-      }
-      renderStudyView();
-    });
-
-    studyCard.addEventListener("click", () => {
-      btnToggleFace.click();
-    });
-
-    // --- Service Worker für PWA registrieren ---
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("service-worker.js").catch(console.error);
-      });
+      return;
     }
 
-    // Initiales Rendern
+    if (currentDeckId) {
+      vList.style.display = "none";
+      vDetail.style.display = "block";
+      vStudy.style.display = "none";
+      renderDeckDetail();
+      return;
+    }
+
+    vList.style.display = "block";
+    vDetail.style.display = "none";
+    vStudy.style.display = "none";
+    renderDeckList();
+  }
+
+  function renderDeckList() {
+    const el = document.getElementById("deck-list");
+    el.innerHTML = "";
+
+    state.decks.forEach(deck => {
+      const div = document.createElement("div");
+      div.className = "deck-item";
+
+      const main = document.createElement("div");
+      main.className = "deck-main";
+      main.onclick = () => { currentDeckId = deck.id; render(); };
+
+      const name = document.createElement("div");
+      name.textContent = deck.name;
+      const meta = document.createElement("div");
+      meta.className = "muted";
+      meta.textContent = `${deck.cards.length} Karten`;
+
+      main.appendChild(name);
+      main.appendChild(meta);
+
+      const learn = document.createElement("button");
+      learn.textContent = "Lernen";
+      learn.className = "small";
+      learn.onclick = e => { e.stopPropagation(); startStudy(deck.id); };
+
+      div.appendChild(main);
+      div.appendChild(learn);
+      el.appendChild(div);
+    });
+  }
+
+  function renderDeckDetail() {
+    const deck = getDeck();
+    if (!deck) return;
+
+    document.getElementById("deck-name-edit").value = deck.name;
+    document.getElementById("deck-exam-date").value = deck.examDate;
+
+    const plan = computePlan(deck);
+    const planDiv = document.getElementById("plan-info");
+    planDiv.innerHTML = plan
+      ? `Tage bis Klausur: ${plan.daysLeft}<br>Karten/Tag: ${plan.cardsPerDay}`
+      : "Kein Klausurdatum gesetzt.";
+
+    const badge = document.getElementById("card-count-badge");
+    badge.textContent = deck.cards.length;
+
+    const list = document.getElementById("card-list");
+    list.innerHTML = "";
+
+    deck.cards.forEach((c, idx) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<strong>${idx + 1}.</strong> ${c.front}`;
+      list.appendChild(div);
+    });
+  }
+
+  function renderStudyView() {
+    const deck = state.decks.find(d => d.id === study.deckId);
+    const cardIndex = study.order[study.index];
+    const card = deck.cards[cardIndex];
+
+    document.getElementById("study-progress").textContent =
+      `Karte ${study.index + 1} von ${deck.cards.length}`;
+
+    document.getElementById("study-face-label").textContent =
+      study.showBack ? "Antwort" : "Frage";
+
+    document.getElementById("study-text").textContent =
+      study.showBack ? card.back : card.front;
+  }
+
+  /* ================================
+     Aktionen
+  =================================*/
+  document.getElementById("btn-add-deck").onclick = () => {
+    const name = document.getElementById("new-deck-name").value.trim();
+    if (!name) return;
+    state.decks.push({
+      id: uuid(),
+      name,
+      examDate: "",
+      cards: []
+    });
+    saveState();
+  };
+
+  document.getElementById("btn-import").onclick = () => {
+    const file = document.getElementById("file-import").files[0];
+    if (!file) return alert("Bitte eine TSV-Datei auswählen.");
+    const reader = new FileReader();
+    reader.onload = e => importTSV(e.target.result, file.name);
+    reader.readAsText(file, "utf-8");
+  };
+
+  document.getElementById("deck-name-edit").oninput = e => {
+    const deck = getDeck();
+    deck.name = e.target.value;
+    saveState();
+  };
+
+  document.getElementById("deck-exam-date").onchange = e => {
+    const deck = getDeck();
+    deck.examDate = e.target.value;
+    saveState();
+  };
+
+  document.getElementById("btn-add-card").onclick = () => {
+    const deck = getDeck();
+    const front = document.getElementById("new-card-front").value.trim();
+    const back = document.getElementById("new-card-back").value.trim();
+    if (!front || !back) return;
+
+    deck.cards.push({ id: uuid(), front, back, timesSeen: 0 });
+    saveState();
+  };
+
+  document.getElementById("btn-start-study").onclick = () => {
+    startStudy(currentDeckId);
+  };
+
+  function startStudy(deckId) {
+    const deck = state.decks.find(d => d.id === deckId);
+    if (!deck || deck.cards.length === 0) return;
+
+    study.deckId = deckId;
+    study.showBack = false;
+    study.index = 0;
+    study.order = deck.cards.map((_, i) => i).sort(() => Math.random() - 0.5);
+
     render();
-  </script>
+  }
+
+  document.getElementById("btn-toggle-face").onclick = () => {
+    study.showBack = !study.showBack;
+    renderStudyView();
+  };
+
+  document.getElementById("btn-next").onclick = () => {
+    const deck = state.decks.find(d => d.id === study.deckId);
+    study.index = (study.index + 1) % deck.cards.length;
+    study.showBack = false;
+    renderStudyView();
+  };
+
+  document.getElementById("btn-exit-study").onclick = () => {
+    study.deckId = null;
+    render();
+  };
+
+  document.getElementById("btn-back").onclick = () => {
+    currentDeckId = null;
+    render();
+  };
+
+  document.getElementById("btn-delete-deck").onclick = () => {
+    if (!confirm("Diesen Stapel löschen?")) return;
+    state.decks = state.decks.filter(d => d.id !== currentDeckId);
+    currentDeckId = null;
+    saveState();
+  };
+
+  document.getElementById("btn-export").onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "backup.json";
+    a.click();
+  };
+
+  /* ================================
+     Service Worker
+  =================================*/
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js");
+  }
+
+  render();
+</script>
+
 </body>
 </html>
