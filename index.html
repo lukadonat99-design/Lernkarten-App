@@ -180,20 +180,30 @@
       Lerne deine Karteikarten für Additive Fertigung. Mehrere Stapel, Klausurdatum und Lernplan – alles lokal im Browser gespeichert.
     </p>
 
-    <div id="view-deck-list" class="card">
-      <div class="flex-between">
-        <h2>Stapel</h2>
-        <button id="btn-export" class="secondary small">Backup exportieren</button>
-      </div>
-      <div class="row flex-responsive mt-sm">
-        <input id="new-deck-name" type="text" placeholder="Neuer Stapelname (z.B. Pulver & Draht)" style="flex:1" />
-        <button id="btn-add-deck">Stapel anlegen</button>
-      </div>
-      <div id="deck-list" class="mt-sm"></div>
-      <p class="muted small mt-sm">
-        Tipp: Die Daten werden im Browser (LocalStorage) gespeichert. Du kannst sie mit „Backup exportieren“ sichern.
-      </p>
-    </div>
+<div id="view-deck-list" class="card">
+  <div class="flex-between">
+    <h2>Stapel</h2>
+    <button id="btn-export" class="secondary small">Backup exportieren</button>
+  </div>
+
+  <div class="row flex-responsive mt-sm">
+    <input id="new-deck-name" type="text" placeholder="Neuer Stapelname (z.B. Pulver & Draht)" style="flex:1" />
+    <button id="btn-add-deck">Stapel anlegen</button>
+  </div>
+
+  <div class="row flex-responsive mt-sm">
+    <input id="file-import" type="file" accept=".tsv,.txt" />
+    <button id="btn-import" class="secondary small">TSV-Deck importieren</button>
+  </div>
+
+  <div id="deck-list" class="mt-sm"></div>
+
+  <p class="muted small mt-sm">
+    Tipp: Du kannst hier die von mir erzeugten <code>.tsv</code>-Dateien (z.B. <code>AM_Complete_Deck.tsv</code>) importieren.
+    Jede Datei wird als eigener Stapel angelegt.
+  </p>
+</div>
+
 
     <div id="view-deck-detail" class="card" style="display:none;">
       <div class="flex-between mb">
@@ -330,6 +340,8 @@
     const newDeckNameInput = document.getElementById("new-deck-name");
     const btnAddDeck = document.getElementById("btn-add-deck");
     const btnExport = document.getElementById("btn-export");
+    const fileImport = document.getElementById("file-import");
+    const btnImport = document.getElementById("btn-import");
 
     const deckDetailNameTag = document.getElementById("deck-detail-name-tag");
     const deckNameEdit = document.getElementById("deck-name-edit");
@@ -551,6 +563,60 @@
       }
     }
 
+function importTSV(text, filename) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (!lines.length) {
+    alert("Die Datei scheint leer zu sein.");
+    return;
+  }
+
+  let startIndex = 0;
+  const firstParts = lines[0].split("\t");
+  if (
+    firstParts.length >= 2 &&
+    /front|vorder/i.test(firstParts[0]) &&
+    /back|r.ckseite/i.test(firstParts[1])
+  ) {
+    // erste Zeile ist Header (Front/Back)
+    startIndex = 1;
+  }
+
+  const cards = [];
+  for (let i = startIndex; i < lines.length; i++) {
+    const parts = lines[i].split("\t");
+    if (parts.length < 2) continue;
+    const front = parts[0].trim();
+    const back = parts[1].trim();
+    if (!front || !back) continue;
+    cards.push({
+      id: uuid(),
+      front,
+      back,
+      lastReviewed: null,
+      timesSeen: 0
+    });
+  }
+
+  if (!cards.length) {
+    alert("Es wurden keine gültigen Karten (Front/Back) gefunden.");
+    return;
+  }
+
+  const baseName = filename.replace(/\.[^.]+$/, "");
+  const deckName = baseName || "Importiertes Deck";
+
+  state.decks.push({
+    id: uuid(),
+    name: deckName,
+    examDate: "",
+    cards
+  });
+
+  saveState();
+  alert(`Deck "${deckName}" mit ${cards.length} Karten importiert.`);
+}
+
+
     // --- Aktionen ---
     btnAddDeck.addEventListener("click", () => {
       const name = newDeckNameInput.value.trim();
@@ -564,6 +630,22 @@
       newDeckNameInput.value = "";
       saveState();
     });
+
+   btnImport.addEventListener("click", () => {
+     if (!fileImport.files || !fileImport.files.length) {
+       alert("Bitte zuerst eine .tsv-Datei auswählen.");
+     return;
+     }
+     const file = fileImport.files[0];
+     const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      importTSV(text, file.name);
+      fileImport.value = ""; // Auswahl zurücksetzen
+      };
+      reader.readAsText(file, "utf-8");
+   });
+
 
     btnExport.addEventListener("click", () => {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
