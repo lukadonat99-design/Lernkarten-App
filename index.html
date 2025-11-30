@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>AM Lernkarten</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f766e" />
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: light dark;
+    }
+    body {
+      margin: 0;
+      background: #0b1120;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .app {
+      width: 100%;
+      max-width: 960px;
+      padding: 1rem;
+    }
+    h1, h2, h3 {
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .card {
+      background: #020617;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid #1f2937;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    }
+    .row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    input[type="text"], input[type="date"], textarea, select {
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 0.5rem;
+      border: 1px solid #4b5563;
+      padding: 0.5rem;
+      font: inherit;
+      min-width: 0;
+    }
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
+    }
+    button {
+      border-radius: 999px;
+      border: 1px solid #0d9488;
+      background: #0f766e;
+      color: white;
+      padding: 0.4rem 0.9rem;
+      font: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    button.secondary {
+      background: transparent;
+      border-color: #4b5563;
+      color: #e5e7eb;
+    }
+    button.danger {
+      background: #b91c1c;
+      border-color: #b91c1c;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      background: #111827;
+      font-size: 0.75rem;
+      border: 1px solid #374151;
+    }
+    .deck-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #111827;
+    }
+    .deck-main {
+      cursor: pointer;
+      flex: 1;
+    }
+    .muted {
+      color: #9ca3af;
+      font-size: 0.85rem;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      font-size: 0.75rem;
+      gap: 0.25rem;
+    }
+    .mt-sm { margin-top: 0.5rem; }
+    .mt { margin-top: 1rem; }
+    .mb { margin-bottom: 1rem; }
+    .flex-between {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .chip-group {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+    .fc-card {
+      min-height: 150px;
+      border-radius: 0.75rem;
+      border: 1px dashed #4b5563;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .fc-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin-bottom: 0.3rem;
+    }
+    .fc-text {
+      font-size: 1.15rem;
+      font-weight: 500;
+      white-space: pre-wrap;
+    }
+    .tag {
+      font-size: 0.7rem;
+      border-radius: 999px;
+      padding: 0.1rem 0.4rem;
+      background: #1f2937;
+      color: #9ca3af;
+    }
+    .small {
+      font-size: 0.8rem;
+    }
+    .danger-text {
+      color: #f87171;
+    }
+    @media (max-width: 600px) {
+      .flex-responsive {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>AM Lernkarten</h1>
+    <p class="muted small">
+      Lerne deine Karteikarten für Additive Fertigung. Mehrere Stapel, Klausurdatum und Lernplan – alles lokal im Browser gespeichert.
+    </p>
+
+    <div id="view-deck-list" class="card">
+      <div class="flex-between">
+        <h2>Stapel</h2>
+        <button id="btn-export" class="secondary small">Backup exportieren</button>
+      </div>
+      <div class="row flex-responsive mt-sm">
+        <input id="new-deck-name" type="text" placeholder="Neuer Stapelname (z.B. Pulver & Draht)" style="flex:1" />
+        <button id="btn-add-deck">Stapel anlegen</button>
+      </div>
+      <div id="deck-list" class="mt-sm"></div>
+      <p class="muted small mt-sm">
+        Tipp: Die Daten werden im Browser (LocalStorage) gespeichert. Du kannst sie mit „Backup exportieren“ sichern.
+      </p>
+    </div>
+
+    <div id="view-deck-detail" class="card" style="display:none;">
+      <div class="flex-between mb">
+        <button id="btn-back" class="secondary small">← Zurück</button>
+        <span id="deck-detail-name-tag" class="badge"></span>
+      </div>
+
+      <h2>Stapel-Details</h2>
+      <div class="row flex-responsive">
+        <input id="deck-name-edit" type="text" />
+        <div class="row" style="align-items:center;">
+          <label for="deck-exam-date" class="small">Klausurdatum:</label>
+          <input id="deck-exam-date" type="date" />
+        </div>
+      </div>
+
+      <div class="mt card" style="background:#020617; border-color:#111827;">
+        <h3>Lernplan</h3>
+        <div id="plan-info" class="small"></div>
+      </div>
+
+      <div class="mt">
+        <div class="flex-between">
+          <h3>Karten</h3>
+          <span id="card-count-badge" class="badge"></span>
+        </div>
+        <div id="card-list" class="mt-sm small"></div>
+
+        <details class="mt">
+          <summary style="cursor:pointer;">Neue Karte hinzufügen</summary>
+          <div class="mt-sm">
+            <label class="small">Vorderseite (Frage/Begriff)</label>
+            <textarea id="new-card-front"></textarea>
+            <label class="small">Rückseite (Antwort/Erklärung)</label>
+            <textarea id="new-card-back"></textarea>
+            <button id="btn-add-card" class="mt-sm">Karte speichern</button>
+          </div>
+        </details>
+      </div>
+
+      <div class="mt flex-between">
+        <button id="btn-start-study">Lernen starten</button>
+        <button id="btn-delete-deck" class="danger small">Stapel löschen</button>
+      </div>
+    </div>
+
+    <div id="view-study" class="card" style="display:none;">
+      <div class="flex-between mb">
+        <button id="btn-exit-study" class="secondary small">← Zurück</button>
+        <span id="study-deck-name" class="badge"></span>
+      </div>
+      <div class="small muted" id="study-progress"></div>
+      <div id="study-card" class="mt fc-card">
+        <div>
+          <div class="fc-label" id="study-face-label">Frage</div>
+          <div class="fc-text" id="study-text"></div>
+        </div>
+      </div>
+      <div class="row mt">
+        <button id="btn-toggle-face">Antwort anzeigen</button>
+        <button id="btn-next" class="secondary">Nächste Karte</button>
+      </div>
+      <p class="small muted mt-sm">
+        Tippe auf die Karte, um ebenfalls Vorder-/Rückseite zu wechseln.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // --- Datenmodell & Storage ---
+    const STORAGE_KEY = "am_flashcards_v1";
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return { decks: [] };
+        return JSON.parse(raw);
+      } catch (e) {
+        console.error("Fehler beim Laden des Zustands:", e);
+        return { decks: [] };
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      render();
+    }
+
+    function uuid() {
+      return crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+
+    let state = loadState();
+    let currentDeckId = null;
+    let study = {
+      deckId: null,
+      index: 0,
+      showBack: false,
+      order: []
+    };
+
+    // --- Hilfsfunktionen ---
+    function getCurrentDeck() {
+      return state.decks.find(d => d.id === currentDeckId) || null;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr + "T00:00:00");
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toLocaleDateString("de-DE");
+    }
+
+    function computePlan(deck) {
+      if (!deck.examDate || !deck.cards.length) return null;
+      const today = new Date();
+      const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const exam = new Date(deck.examDate + "T00:00:00");
+      const diffMs = exam - todayMid;
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays <= 0) return { daysLeft: diffDays, cardsPerDay: null };
+      const cardsPerDay = Math.ceil(deck.cards.length / diffDays);
+      return { daysLeft: diffDays, cardsPerDay };
+    }
+
+    // --- UI-Rendering ---
+    const viewDeckList = document.getElementById("view-deck-list");
+    const viewDeckDetail = document.getElementById("view-deck-detail");
+    const viewStudy = document.getElementById("view-study");
+
+    const deckListEl = document.getElementById("deck-list");
+    const newDeckNameInput = document.getElementById("new-deck-name");
+    const btnAddDeck = document.getElementById("btn-add-deck");
+    const btnExport = document.getElementById("btn-export");
+
+    const deckDetailNameTag = document.getElementById("deck-detail-name-tag");
+    const deckNameEdit = document.getElementById("deck-name-edit");
+    const deckExamDate = document.getElementById("deck-exam-date");
+    const planInfo = document.getElementById("plan-info");
+    const cardCountBadge = document.getElementById("card-count-badge");
+    const cardList = document.getElementById("card-list");
+    const newCardFront = document.getElementById("new-card-front");
+    const newCardBack = document.getElementById("new-card-back");
+    const btnAddCard = document.getElementById("btn-add-card");
+    const btnDeleteDeck = document.getElementById("btn-delete-deck");
+    const btnBack = document.getElementById("btn-back");
+    const btnStartStudy = document.getElementById("btn-start-study");
+
+    const studyDeckName = document.getElementById("study-deck-name");
+    const studyProgress = document.getElementById("study-progress");
+    const studyFaceLabel = document.getElementById("study-face-label");
+    const studyText = document.getElementById("study-text");
+    const studyCard = document.getElementById("study-card");
+    const btnToggleFace = document.getElementById("btn-toggle-face");
+    const btnNext = document.getElementById("btn-next");
+    const btnExitStudy = document.getElementById("btn-exit-study");
+
+    function renderDeckList() {
+      if (!state.decks.length) {
+        deckListEl.innerHTML = `<p class="muted small">Noch keine Stapel angelegt. Lege oben deinen ersten Stapel an.</p>`;
+        return;
+      }
+      deckListEl.innerHTML = "";
+      state.decks.forEach(deck => {
+        const div = document.createElement("div");
+        div.className = "deck-item";
+
+        const main = document.createElement("div");
+        main.className = "deck-main";
+        main.onclick = () => {
+          currentDeckId = deck.id;
+          render();
+        };
+
+        const title = document.createElement("div");
+        title.textContent = deck.name || "Unbenannter Stapel";
+
+        const meta = document.createElement("div");
+        meta.className = "muted small";
+
+        const parts = [];
+        parts.push(`${deck.cards.length} Karten`);
+
+        if (deck.examDate) {
+          const plan = computePlan(deck);
+          let s = `Klausur: ${formatDate(deck.examDate)}`;
+          if (plan) {
+            if (plan.daysLeft > 0 && plan.cardsPerDay) {
+              s += ` • Plan: ~${plan.cardsPerDay} Karten/Tag (${plan.daysLeft} Tage)`;
+            } else if (plan.daysLeft === 0) {
+              s += ` • Heute ist Klausurtag`;
+            } else if (plan.daysLeft < 0) {
+              s += ` • Klausur vorbei`;
+            }
+          }
+          parts.push(s);
+        }
+
+        meta.textContent = parts.join(" | ");
+
+        main.appendChild(title);
+        main.appendChild(meta);
+
+        const actions = document.createElement("div");
+        actions.className = "chip-group";
+
+        const btnStudy = document.createElement("button");
+        btnStudy.textContent = "Lernen";
+        btnStudy.className = "small";
+        btnStudy.onclick = (e) => {
+          e.stopPropagation();
+          startStudy(deck.id);
+        };
+
+        const del = document.createElement("button");
+        del.textContent = "✕";
+        del.className = "secondary small";
+        del.onclick = (e) => {
+          e.stopPropagation();
+          if (confirm(`Stapel "${deck.name}" wirklich löschen?`)) {
+            state.decks = state.decks.filter(d => d.id !== deck.id);
+            if (currentDeckId === deck.id) currentDeckId = null;
+            saveState();
+          }
+        };
+
+        actions.appendChild(btnStudy);
+        actions.appendChild(del);
+
+        div.appendChild(main);
+        div.appendChild(actions);
+        deckListEl.appendChild(div);
+      });
+    }
+
+    function renderDeckDetail() {
+      const deck = getCurrentDeck();
+      if (!deck) return;
+
+      deckDetailNameTag.textContent = deck.name || "Stapel";
+      deckNameEdit.value = deck.name || "";
+      deckExamDate.value = deck.examDate || "";
+
+      const plan = computePlan(deck);
+      let html = "";
+      html += `<div>Karten insgesamt: <strong>${deck.cards.length}</strong></div>`;
+      if (deck.examDate) {
+        html += `<div>Klausurdatum: <strong>${formatDate(deck.examDate)}</strong></div>`;
+        if (plan) {
+          if (plan.daysLeft > 0 && plan.cardsPerDay) {
+            html += `<div>Verbleibende Tage: <strong>${plan.daysLeft}</strong></div>`;
+            html += `<div>Empfehlung: ca. <strong>${plan.cardsPerDay}</strong> Karten/Tag</div>`;
+          } else if (plan.daysLeft === 0) {
+            html += `<div class="danger-text">Heute ist Klausurtag – go, go, go 💪</div>`;
+          } else if (plan.daysLeft < 0) {
+            html += `<div class="muted">Klausur liegt bereits in der Vergangenheit.</div>`;
+          }
+        }
+      } else {
+        html += `<div class="muted small">Setze ein Klausurdatum, um einen Lernplan zu berechnen.</div>`;
+      }
+      planInfo.innerHTML = html;
+
+      cardCountBadge.textContent = `${deck.cards.length} Karten`;
+
+      if (!deck.cards.length) {
+        cardList.innerHTML = `<p class="muted small">Noch keine Karten in diesem Stapel.</p>`;
+      } else {
+        cardList.innerHTML = "";
+        deck.cards.forEach((card, index) => {
+          const row = document.createElement("div");
+          row.className = "mt-sm";
+
+          const top = document.createElement("div");
+          top.className = "small";
+          top.innerHTML = `<strong>${index + 1}.</strong> ${card.front}`;
+
+          const bottom = document.createElement("div");
+          bottom.className = "small muted";
+          bottom.textContent = card.back.length > 120
+            ? card.back.slice(0, 120) + "…"
+            : card.back;
+
+          const meta = document.createElement("div");
+          meta.className = "chip-group mt-sm";
+
+          const seen = document.createElement("span");
+          seen.className = "tag";
+          seen.textContent = `gesehen: ${card.timesSeen || 0}x`;
+          meta.appendChild(seen);
+
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Löschen";
+          delBtn.className = "secondary small";
+          delBtn.onclick = () => {
+            if (confirm("Diese Karte wirklich löschen?")) {
+              deck.cards.splice(index, 1);
+              saveState();
+            }
+          };
+          meta.appendChild(delBtn);
+
+          row.appendChild(top);
+          row.appendChild(bottom);
+          row.appendChild(meta);
+
+          cardList.appendChild(row);
+        });
+      }
+    }
+
+    function renderStudyView() {
+      const deck = state.decks.find(d => d.id === study.deckId);
+      if (!deck) return;
+
+      studyDeckName.textContent = deck.name || "Stapel";
+      const total = study.order.length;
+      if (!total) {
+        studyProgress.textContent = "Keine Karten im Stapel.";
+        studyText.textContent = "";
+        btnToggleFace.disabled = true;
+        btnNext.disabled = true;
+        return;
+      }
+      const currentPos = study.index + 1;
+      studyProgress.textContent = `Karte ${currentPos} von ${total}`;
+      btnToggleFace.disabled = false;
+      btnNext.disabled = false;
+
+      const cardIndex = study.order[study.index];
+      const card = deck.cards[cardIndex];
+
+      studyFaceLabel.textContent = study.showBack ? "Antwort" : "Frage";
+      studyText.textContent = study.showBack ? card.back : card.front;
+    }
+
+    function render() {
+      if (study.deckId) {
+        viewDeckList.style.display = "none";
+        viewDeckDetail.style.display = "none";
+        viewStudy.style.display = "block";
+        renderStudyView();
+      } else if (currentDeckId) {
+        viewDeckList.style.display = "none";
+        viewDeckDetail.style.display = "block";
+        viewStudy.style.display = "none";
+        renderDeckDetail();
+      } else {
+        viewDeckList.style.display = "block";
+        viewDeckDetail.style.display = "none";
+        viewStudy.style.display = "none";
+        renderDeckList();
+      }
+    }
+
+    // --- Aktionen ---
+    btnAddDeck.addEventListener("click", () => {
+      const name = newDeckNameInput.value.trim();
+      if (!name) return;
+      state.decks.push({
+        id: uuid(),
+        name,
+        examDate: "",
+        cards: []
+      });
+      newDeckNameInput.value = "";
+      saveState();
+    });
+
+    btnExport.addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "am_flashcards_backup.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    deckNameEdit.addEventListener("input", () => {
+      const deck = getCurrentDeck();
+      if (!deck) return;
+      deck.name = deckNameEdit.value;
+      saveState();
+    });
+
+    deckExamDate.addEventListener("change", () => {
+      const deck = getCurrentDeck();
+      if (!deck) return;
+      deck.examDate = deckExamDate.value || "";
+      saveState();
+    });
+
+    btnAddCard.addEventListener("click", () => {
+      const deck = getCurrentDeck();
+      if (!deck) return;
+      const front = newCardFront.value.trim();
+      const back = newCardBack.value.trim();
+      if (!front || !back) return;
+      deck.cards.push({
+        id: uuid(),
+        front,
+        back,
+        lastReviewed: null,
+        timesSeen: 0
+      });
+      newCardFront.value = "";
+      newCardBack.value = "";
+      saveState();
+    });
+
+    btnDeleteDeck.addEventListener("click", () => {
+      const deck = getCurrentDeck();
+      if (!deck) return;
+      if (confirm(`Stapel "${deck.name}" wirklich löschen?`)) {
+        state.decks = state.decks.filter(d => d.id !== deck.id);
+        currentDeckId = null;
+        saveState();
+      }
+    });
+
+    btnBack.addEventListener("click", () => {
+      currentDeckId = null;
+      render();
+    });
+
+    function startStudy(deckId) {
+      const deck = state.decks.find(d => d.id === deckId);
+      if (!deck || !deck.cards.length) return;
+      study.deckId = deck.id;
+      study.index = 0;
+      study.showBack = false;
+      study.order = deck.cards.map((_, i) => i);
+      // Shuffle
+      for (let i = study.order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [study.order[i], study.order[j]] = [study.order[j], study.order[i]];
+      }
+      render();
+    }
+
+    btnStartStudy.addEventListener("click", () => {
+      const deck = getCurrentDeck();
+      if (!deck) return;
+      startStudy(deck.id);
+    });
+
+    btnExitStudy.addEventListener("click", () => {
+      study.deckId = null;
+      render();
+    });
+
+    btnToggleFace.addEventListener("click", () => {
+      const deck = state.decks.find(d => d.id === study.deckId);
+      if (!deck) return;
+      const cardIndex = study.order[study.index];
+      const card = deck.cards[cardIndex];
+      if (!study.showBack) {
+        card.timesSeen = (card.timesSeen || 0) + 1;
+        card.lastReviewed = new Date().toISOString();
+        saveState();
+      }
+      study.showBack = !study.showBack;
+      renderStudyView();
+    });
+
+    btnNext.addEventListener("click", () => {
+      const deck = state.decks.find(d => d.id === study.deckId);
+      if (!deck) return;
+      if (!deck.cards.length) return;
+      study.showBack = false;
+      study.index++;
+      if (study.index >= study.order.length) {
+        // Wieder von vorne
+        study.index = 0;
+      }
+      renderStudyView();
+    });
+
+    studyCard.addEventListener("click", () => {
+      btnToggleFace.click();
+    });
+
+    // --- Service Worker für PWA registrieren ---
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(console.error);
+      });
+    }
+
+    // Initiales Rendern
+    render();
+  </script>
+</body>
+</html>
