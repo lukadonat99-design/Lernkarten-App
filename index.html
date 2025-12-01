@@ -64,6 +64,8 @@
       resize: vertical;
     }
     .row { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .mt-sm { margin-top: .5rem; }
+    .mt    { margin-top: 1rem; }
     .flex-between { display: flex; justify-content: space-between; align-items: center; }
     .badge {
       background: #111827;
@@ -101,7 +103,9 @@
 <div class="app">
 
   <h1>AM Lernkarten</h1>
-  <p class="muted">Lerne deine Karteikarten für Additive Fertigung. Jetzt auch mit TSV-Import.</p>
+  <p class="muted">
+    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel und 5-Minuten-Wiederholungen bei Fehlern.
+  </p>
 
   <!-- =========================
        VIEW: DECK LIST
@@ -146,7 +150,9 @@
       <div id="plan-info" class="muted"></div>
     </div>
 
-    <h3 class="mt">Karten <span id="card-count-badge" class="badge"></span></h3>
+    <h3 class="mt">
+      Karten <span id="card-count-badge" class="badge"></span>
+    </h3>
     <div id="card-list"></div>
 
     <details class="mt">
@@ -157,7 +163,8 @@
     </details>
 
     <div class="row mt">
-      <button id="btn-start-study">Lernen</button>
+      <button id="btn-start-study-plan">Nach Lernplan lernen</button>
+      <button id="btn-start-study-all" class="secondary">Alle Karten lernen</button>
       <button id="btn-delete-deck" class="secondary small">Stapel löschen</button>
     </div>
   </div>
@@ -168,7 +175,7 @@
   <div id="view-study" class="card" style="display:none;">
     <button id="btn-exit-study" class="secondary small">⬅ Beenden</button>
 
-    <div id="study-progress" class="muted"></div>
+    <div id="study-progress" class="muted mt-sm"></div>
 
     <div id="study-card" class="fc-card mt">
       <div>
@@ -179,7 +186,9 @@
 
     <div class="row mt">
       <button id="btn-toggle-face">Antwort anzeigen</button>
-      <button id="btn-next" class="secondary">Nächste</button>
+      <button id="btn-mark-correct" class="small">Richtig</button>
+      <button id="btn-mark-wrong" class="secondary small">Falsch</button>
+      <button id="btn-next" class="secondary small">Überspringen</button>
     </div>
   </div>
 
@@ -189,13 +198,16 @@
      JAVASCRIPT LOGIK
 ===============================================================-->
 <script>
-  /* === Globale Variablen === */
-  const STORAGE_KEY = "am_flashcards_v1";
+  // Speicher-Version hochgesetzt, damit alte Struktur sicher migriert wird
+  const STORAGE_KEY = "am_flashcards_v3";
+
   let state = loadState();
   let currentDeckId = null;
 
+  // Lernmodus: 'plan' (fällige Karten) oder 'all' (alle Karten)
   let study = {
     deckId: null,
+    mode: "plan",
     index: 0,
     showBack: false,
     order: []
@@ -206,9 +218,26 @@
     return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
   }
 
+  function todayDateOnly() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
   function loadState() {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { decks: [] };
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { decks: [] };
+      const s = JSON.parse(raw);
+
+      // Fallback für Karten ohne stage/nextReviewAt (alte Versionen)
+      s.decks.forEach(deck => {
+        deck.cards.forEach(c => {
+          if (typeof c.stage === "undefined") c.stage = 0;
+          if (!c.nextReviewAt) c.nextReviewAt = new Date().toISOString();
+        });
+      });
+
+      return s;
     } catch {
       return { decks: [] };
     }
@@ -223,16 +252,30 @@
     return state.decks.find(d => d.id === currentDeckId);
   }
 
+  // Lernziel: alle Karten bis Stufe 5 -> fehlende Wiederholungen zählen
   function computePlan(deck) {
     if (!deck.examDate || deck.cards.length === 0) return null;
-    const today = new Date();
-    const exam = new Date(deck.examDate);
-    const diff = Math.ceil((exam - today) / (1000 * 60 * 60 * 24));
-    if (diff <= 0) return { daysLeft: diff };
-    return {
-      daysLeft: diff,
-      cardsPerDay: Math.ceil(deck.cards.length / diff)
-    };
+
+    const today = todayDateOnly();
+    const exam = new Date(deck.examDate + "T00:00:00");
+    if (Number.isNaN(exam.getTime())) return null;
+
+    const diffMs = exam - today;
+    const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    let remainingReviews = 0;
+    deck.cards.forEach(c => {
+      const stage = c.stage || 0;
+      const missing = Math.max(0, 5 - stage);
+      remainingReviews += missing;
+    });
+
+    if (daysLeft <= 0) {
+      return { daysLeft, remainingReviews, reviewsPerDay: null };
+    }
+
+    const reviewsPerDay = Math.ceil(remainingReviews / daysLeft);
+    return { daysLeft, remainingReviews, reviewsPerDay };
   }
 
   /* ================================
@@ -240,28 +283,42 @@
   =================================*/
   function importTSV(text, filename) {
     const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-    if (lines.length === 0) return alert("Die Datei ist leer.");
+    if (lines.length === 0) {
+      alert("Die Datei ist leer.");
+      return;
+    }
 
     let start = 0;
     const header = lines[0].split("\t");
-    if (/front/i.test(header[0]) && /back|r.ckseite/i.test(header[1])) start = 1;
+    if (/front|vorder/i.test(header[0]) && /back|r.ckseite/i.test(header[1])) {
+      start = 1; // Header überspringen
+    }
 
     const cards = [];
+    const nowIso = new Date().toISOString();
     for (let i = start; i < lines.length; i++) {
-      const [front, back] = lines[i].split("\t");
+      const parts = lines[i].split("\t");
+      if (parts.length < 2) continue;
+      const front = parts[0].trim();
+      const back = parts[1].trim();
       if (!front || !back) continue;
       cards.push({
         id: uuid(),
-        front: front.trim(),
-        back: back.trim(),
+        front,
+        back,
         lastReviewed: null,
-        timesSeen: 0
+        timesSeen: 0,
+        stage: 0,
+        nextReviewAt: nowIso
       });
     }
 
-    if (!cards.length) return alert("Keine gültigen Karten gefunden.");
+    if (!cards.length) {
+      alert("Keine gültigen Karten gefunden.");
+      return;
+    }
 
-    const deckName = filename.replace(/\.[^.]+$/, "");
+    const deckName = filename.replace(/\.[^.]+$/, "") || "Importiertes Deck";
     state.decks.push({
       id: uuid(),
       name: deckName,
@@ -274,7 +331,7 @@
   }
 
   /* ================================
-     Rendering
+     Render-Logik
   =================================*/
   function render() {
     const vList = document.getElementById("view-deck-list");
@@ -307,6 +364,11 @@
     const el = document.getElementById("deck-list");
     el.innerHTML = "";
 
+    if (!state.decks.length) {
+      el.innerHTML = '<p class="muted">Noch keine Stapel angelegt.</p>';
+      return;
+    }
+
     state.decks.forEach(deck => {
       const div = document.createElement("div");
       div.className = "deck-item";
@@ -316,21 +378,50 @@
       main.onclick = () => { currentDeckId = deck.id; render(); };
 
       const name = document.createElement("div");
-      name.textContent = deck.name;
+      name.textContent = deck.name || "Unbenannter Stapel";
+
       const meta = document.createElement("div");
       meta.className = "muted";
-      meta.textContent = `${deck.cards.length} Karten`;
+
+      let metaStr = `${deck.cards.length} Karten`;
+      if (deck.examDate) {
+        const plan = computePlan(deck);
+        if (plan) {
+          if (plan.daysLeft > 0 && plan.reviewsPerDay !== null) {
+            metaStr += ` • ${plan.daysLeft} Tage • ca. ${plan.reviewsPerDay} Wiederh./Tag`;
+          } else if (plan.daysLeft <= 0) {
+            metaStr += " • Klausurdatum erreicht/überschritten";
+          }
+        }
+      }
+      meta.textContent = metaStr;
 
       main.appendChild(name);
       main.appendChild(meta);
 
-      const learn = document.createElement("button");
-      learn.textContent = "Lernen";
-      learn.className = "small";
-      learn.onclick = e => { e.stopPropagation(); startStudy(deck.id); };
+      const learnBtn = document.createElement("button");
+      learnBtn.textContent = "Plan";
+      learnBtn.className = "small";
+      learnBtn.onclick = e => {
+        e.stopPropagation();
+        startStudy(deck.id, "plan");
+      };
+
+      const allBtn = document.createElement("button");
+      allBtn.textContent = "Alle";
+      allBtn.className = "secondary small";
+      allBtn.style.marginLeft = ".25rem";
+      allBtn.onclick = e => {
+        e.stopPropagation();
+        startStudy(deck.id, "all");
+      };
+
+      const right = document.createElement("div");
+      right.appendChild(learnBtn);
+      right.appendChild(allBtn);
 
       div.appendChild(main);
-      div.appendChild(learn);
+      div.appendChild(right);
       el.appendChild(div);
     });
   }
@@ -339,14 +430,26 @@
     const deck = getDeck();
     if (!deck) return;
 
-    document.getElementById("deck-name-edit").value = deck.name;
-    document.getElementById("deck-exam-date").value = deck.examDate;
+    document.getElementById("deck-name-edit").value = deck.name || "";
+    document.getElementById("deck-exam-date").value = deck.examDate || "";
 
     const plan = computePlan(deck);
     const planDiv = document.getElementById("plan-info");
-    planDiv.innerHTML = plan
-      ? `Tage bis Klausur: ${plan.daysLeft}<br>Karten/Tag: ${plan.cardsPerDay}`
-      : "Kein Klausurdatum gesetzt.";
+
+    if (!deck.examDate) {
+      planDiv.innerHTML = "Setze ein Klausurdatum, um einen Lernplan zu erzeugen.";
+    } else if (!plan) {
+      planDiv.innerHTML = "Keine Plan-Daten verfügbar.";
+    } else if (plan.daysLeft <= 0) {
+      planDiv.innerHTML =
+        `Klausurdatum erreicht oder überschritten.<br>` +
+        `Fehlende Wiederholungen bis Stufe 5: <strong>${plan.remainingReviews}</strong>.`;
+    } else {
+      planDiv.innerHTML =
+        `Tage bis Klausur: <strong>${plan.daysLeft}</strong><br>` +
+        `Fehlende Wiederholungen bis Stufe 5: <strong>${plan.remainingReviews}</strong><br>` +
+        `Empfohlen: ca. <strong>${plan.reviewsPerDay}</strong> Wiederholungen/Tag.`;
+    }
 
     const badge = document.getElementById("card-count-badge");
     badge.textContent = deck.cards.length;
@@ -356,18 +459,41 @@
 
     deck.cards.forEach((c, idx) => {
       const div = document.createElement("div");
-      div.innerHTML = `<strong>${idx + 1}.</strong> ${c.front}`;
+      div.className = "mt-sm";
+      const stage = c.stage || 0;
+      let nextStr = "-";
+      if (c.nextReviewAt) {
+        const d = new Date(c.nextReviewAt);
+        if (!Number.isNaN(d.getTime())) {
+          nextStr = d.toLocaleString("de-DE");
+        }
+      }
+      div.innerHTML =
+        `<div><strong>${idx + 1}.</strong> ${c.front}</div>` +
+        `<div class="muted">Stufe: ${stage}/5 • Nächste Wiederholung: ${nextStr}</div>`;
       list.appendChild(div);
     });
   }
 
   function renderStudyView() {
     const deck = state.decks.find(d => d.id === study.deckId);
-    const cardIndex = study.order[study.index];
-    const card = deck.cards[cardIndex];
+    if (!deck) return;
+
+    if (!study.order.length) {
+      document.getElementById("study-progress").textContent =
+        study.mode === "plan"
+          ? "Heute sind keine Karten laut Lernplan fällig."
+          : "Keine Karten im Stapel.";
+      document.getElementById("study-text").textContent = "";
+      return;
+    }
+
+    const idx = study.order[study.index];
+    const card = deck.cards[idx];
 
     document.getElementById("study-progress").textContent =
-      `Karte ${study.index + 1} von ${deck.cards.length}`;
+      `Modus: ${study.mode === "plan" ? "Lernplan" : "Alle Karten"} • ` +
+      `Karte ${study.index + 1} von ${study.order.length} • Stufe ${card.stage || 0}/5`;
 
     document.getElementById("study-face-label").textContent =
       study.showBack ? "Antwort" : "Frage";
@@ -377,81 +503,207 @@
   }
 
   /* ================================
-     Aktionen
+     Lern-Logik (Stufen + Zeit)
+  =================================*/
+  function scheduleCorrect(card, examDateStr) {
+    let stage = card.stage || 0;
+    if (stage < 5) stage += 1;
+    card.stage = stage;
+
+    // Intervall in Tagen je Stufe
+    let intervalDays;
+    switch (stage) {
+      case 1: intervalDays = 1; break;
+      case 2: intervalDays = 2; break;
+      case 3: intervalDays = 3; break;
+      case 4: intervalDays = 7; break;
+      default: intervalDays = 15; break;
+    }
+
+    const now = new Date();
+    let next = new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+
+    if (examDateStr) {
+      const exam = new Date(examDateStr + "T23:59:59");
+      if (!Number.isNaN(exam.getTime()) && next > exam) {
+        next = exam;
+      }
+    }
+
+    card.nextReviewAt = next.toISOString();
+    card.lastReviewed = now.toISOString();
+    card.timesSeen = (card.timesSeen || 0) + 1;
+  }
+
+  function scheduleWrong(card, examDateStr) {
+    // Zurück auf Stufe 0, erneute Wiederholung nach 5 Minuten (heute)
+    card.stage = 0;
+
+    const now = new Date();
+    let next = new Date(now.getTime() + 5 * 60 * 1000); // +5 Minuten
+
+    if (examDateStr) {
+      const exam = new Date(examDateStr + "T23:59:59");
+      if (!Number.isNaN(exam.getTime()) && next > exam) {
+        next = exam;
+      }
+    }
+
+    card.nextReviewAt = next.toISOString();
+    card.lastReviewed = now.toISOString();
+    card.timesSeen = (card.timesSeen || 0) + 1;
+  }
+
+  function startStudy(deckId, mode) {
+    const deck = state.decks.find(d => d.id === deckId);
+    if (!deck || !deck.cards.length) {
+      alert("In diesem Stapel sind noch keine Karten.");
+      return;
+    }
+
+    study.mode = mode || "plan";
+    study.deckId = deckId;
+    study.showBack = false;
+
+    const now = new Date();
+    let indices;
+
+    if (study.mode === "plan") {
+      indices = deck.cards
+        .map((c, i) => ({ c, i }))
+        .filter(obj => {
+          if (!obj.c.nextReviewAt) return true;
+          const d = new Date(obj.c.nextReviewAt);
+          if (Number.isNaN(d.getTime())) return true;
+          return d <= now;
+        })
+        .map(obj => obj.i);
+
+      if (!indices.length) {
+        alert("Aktuell sind keine Karten laut Lernplan fällig. Du kannst 'Alle Karten lernen' wählen.");
+        study.deckId = null;
+        render();
+        return;
+      }
+    } else {
+      indices = deck.cards.map((_, i) => i);
+    }
+
+    // Shuffle
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    study.order = indices;
+    study.index = 0;
+    renderStudyView();
+  }
+
+  function gotoNextCard() {
+    const deck = state.decks.find(d => d.id === study.deckId);
+    if (!deck) return;
+
+    if (!study.order.length) {
+      study.deckId = null;
+      render();
+      return;
+    }
+
+    study.index++;
+    if (study.index >= study.order.length) {
+      alert("Lerndurchgang abgeschlossen.");
+      study.deckId = null;
+      render();
+    } else {
+      study.showBack = false;
+      renderStudyView();
+    }
+  }
+
+  /* ================================
+     Event-Handler
   =================================*/
   document.getElementById("btn-add-deck").onclick = () => {
     const name = document.getElementById("new-deck-name").value.trim();
     if (!name) return;
+    const nowIso = new Date().toISOString();
     state.decks.push({
       id: uuid(),
       name,
       examDate: "",
       cards: []
     });
+    document.getElementById("new-deck-name").value = "";
     saveState();
   };
 
   document.getElementById("btn-import").onclick = () => {
     const file = document.getElementById("file-import").files[0];
-    if (!file) return alert("Bitte eine TSV-Datei auswählen.");
+    if (!file) {
+      alert("Bitte eine TSV-Datei auswählen.");
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = e => importTSV(e.target.result, file.name);
+    reader.onload = e => {
+      importTSV(e.target.result, file.name);
+      document.getElementById("file-import").value = "";
+    };
     reader.readAsText(file, "utf-8");
   };
 
   document.getElementById("deck-name-edit").oninput = e => {
     const deck = getDeck();
+    if (!deck) return;
     deck.name = e.target.value;
     saveState();
   };
 
   document.getElementById("deck-exam-date").onchange = e => {
     const deck = getDeck();
-    deck.examDate = e.target.value;
+    if (!deck) return;
+    deck.examDate = e.target.value || "";
     saveState();
   };
 
   document.getElementById("btn-add-card").onclick = () => {
     const deck = getDeck();
+    if (!deck) return;
     const front = document.getElementById("new-card-front").value.trim();
     const back = document.getElementById("new-card-back").value.trim();
     if (!front || !back) return;
-
-    deck.cards.push({ id: uuid(), front, back, timesSeen: 0 });
+    const nowIso = new Date().toISOString();
+    deck.cards.push({
+      id: uuid(),
+      front,
+      back,
+      lastReviewed: null,
+      timesSeen: 0,
+      stage: 0,
+      nextReviewAt: nowIso
+    });
+    document.getElementById("new-card-front").value = "";
+    document.getElementById("new-card-back").value = "";
     saveState();
   };
 
-  document.getElementById("btn-start-study").onclick = () => {
-    startStudy(currentDeckId);
+  document.getElementById("btn-start-study-plan").onclick = () => {
+    if (!currentDeckId) return;
+    startStudy(currentDeckId, "plan");
   };
 
-  function startStudy(deckId) {
-    const deck = state.decks.find(d => d.id === deckId);
-    if (!deck || deck.cards.length === 0) return;
-
-    study.deckId = deckId;
-    study.showBack = false;
-    study.index = 0;
-    study.order = deck.cards.map((_, i) => i).sort(() => Math.random() - 0.5);
-
-    render();
-  }
-
-  document.getElementById("btn-toggle-face").onclick = () => {
-    study.showBack = !study.showBack;
-    renderStudyView();
+  document.getElementById("btn-start-study-all").onclick = () => {
+    if (!currentDeckId) return;
+    startStudy(currentDeckId, "all");
   };
 
-  document.getElementById("btn-next").onclick = () => {
-    const deck = state.decks.find(d => d.id === study.deckId);
-    study.index = (study.index + 1) % deck.cards.length;
-    study.showBack = false;
-    renderStudyView();
-  };
-
-  document.getElementById("btn-exit-study").onclick = () => {
-    study.deckId = null;
-    render();
+  document.getElementById("btn-delete-deck").onclick = () => {
+    const deck = getDeck();
+    if (!deck) return;
+    if (!confirm(`Stapel "${deck.name}" wirklich löschen?`)) return;
+    state.decks = state.decks.filter(d => d.id !== deck.id);
+    currentDeckId = null;
+    saveState();
   };
 
   document.getElementById("btn-back").onclick = () => {
@@ -459,18 +711,45 @@
     render();
   };
 
-  document.getElementById("btn-delete-deck").onclick = () => {
-    if (!confirm("Diesen Stapel löschen?")) return;
-    state.decks = state.decks.filter(d => d.id !== currentDeckId);
-    currentDeckId = null;
+  document.getElementById("btn-exit-study").onclick = () => {
+    study.deckId = null;
+    render();
+  };
+
+  document.getElementById("btn-toggle-face").onclick = () => {
+    study.showBack = !study.showBack;
+    renderStudyView();
+  };
+
+  document.getElementById("btn-mark-correct").onclick = () => {
+    const deck = state.decks.find(d => d.id === study.deckId);
+    if (!deck || !study.order.length) return;
+    const idx = study.order[study.index];
+    const card = deck.cards[idx];
+    scheduleCorrect(card, deck.examDate);
     saveState();
+    gotoNextCard();
+  };
+
+  document.getElementById("btn-mark-wrong").onclick = () => {
+    const deck = state.decks.find(d => d.id === study.deckId);
+    if (!deck || !study.order.length) return;
+    const idx = study.order[study.index];
+    const card = deck.cards[idx];
+    scheduleWrong(card, deck.examDate);
+    saveState();
+    gotoNextCard();
+  };
+
+  document.getElementById("btn-next").onclick = () => {
+    gotoNextCard();
   };
 
   document.getElementById("btn-export").onclick = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "backup.json";
+    a.download = "am_flashcards_backup.json";
     a.click();
   };
 
@@ -478,7 +757,7 @@
      Service Worker
   =================================*/
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js");
+    navigator.serviceWorker.register("service-worker.js").catch(console.error);
   }
 
   render();
@@ -486,5 +765,4 @@
 
 </body>
 </html>
-
 
