@@ -107,7 +107,8 @@
 
   <h1>AM Lernkarten</h1>
   <p class="muted">
-    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel, 5-Minuten-Wiederholung bei Fehlern und TSV-Import (inkl. Lecture-Spalte).
+    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel,
+    5-Minuten-Wiederholung bei Fehlern, TSV-Import (inkl. Lecture-Spalte) und Backup-Sync.
   </p>
 
   <!-- =========================
@@ -117,6 +118,12 @@
     <div class="flex-between">
       <h2>Stapel</h2>
       <button id="btn-export" class="secondary small">Backup exportieren</button>
+    </div>
+
+    <!-- Backup Import -->
+    <div class="row mt-sm">
+      <input id="file-backup" type="file" accept="application/json" />
+      <button id="btn-import-backup" class="secondary small">Backup importieren</button>
     </div>
 
     <!-- Neues Deck -->
@@ -232,21 +239,26 @@
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
+  // Normalisiert eingelesene States (auch aus alten Backups)
+  function normalizeState(s) {
+    if (!s || !Array.isArray(s.decks)) return { decks: [] };
+    s.decks.forEach(deck => {
+      if (!Array.isArray(deck.cards)) deck.cards = [];
+      deck.cards.forEach(c => {
+        if (typeof c.stage === "undefined") c.stage = 0;
+        if (!c.nextReviewAt) c.nextReviewAt = new Date().toISOString();
+        if (typeof c.lecture === "undefined") c.lecture = "";
+      });
+    });
+    return s;
+  }
+
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return { decks: [] };
-      const s = JSON.parse(raw);
-
-      s.decks.forEach(deck => {
-        deck.cards.forEach(c => {
-          if (typeof c.stage === "undefined") c.stage = 0;
-          if (!c.nextReviewAt) c.nextReviewAt = new Date().toISOString();
-          if (typeof c.lecture === "undefined") c.lecture = "";
-        });
-      });
-
-      return s;
+      const parsed = JSON.parse(raw);
+      return normalizeState(parsed);
     } catch {
       return { decks: [] };
     }
@@ -261,7 +273,8 @@
     return state.decks.find(d => d.id === currentDeckId);
   }
 
-  // Lernziel: alle Karten bis Stufe 5 -> fehlende Wiederholungen zählen
+  // Lernziel: alle Karten bis Stufe 5
+  // Empfehlung orientiert sich an Karten mit Stufe <5 (inkl. neuer) + 5er-Ziel im Hintergrund
   function computePlan(deck) {
     if (!deck.examDate || deck.cards.length === 0) return null;
 
@@ -272,19 +285,25 @@
     const diffMs = exam - today;
     const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    let remainingReviews = 0;
+    let remainingReviews = 0;   // noch fehlende Wiederholungen bis Stufe 5
+    let activeCards = 0;        // Karten, die noch "Arbeit" brauchen: Stufe 0–4
+
     deck.cards.forEach(c => {
       const stage = c.stage || 0;
-      const missing = Math.max(0, 5 - stage);
-      remainingReviews += missing;
+      if (stage < 5) {
+        activeCards += 1;
+        remainingReviews += Math.max(0, 5 - stage);
+      }
     });
 
     if (daysLeft <= 0) {
-      return { daysLeft, remainingReviews, reviewsPerDay: null };
+      return { daysLeft, remainingReviews, activeCards, cardsPerDay: null, reviewsPerDay: null };
     }
 
+    const cardsPerDay = Math.ceil(activeCards / daysLeft);
     const reviewsPerDay = Math.ceil(remainingReviews / daysLeft);
-    return { daysLeft, remainingReviews, reviewsPerDay };
+
+    return { daysLeft, remainingReviews, activeCards, cardsPerDay, reviewsPerDay };
   }
 
   /* ================================
@@ -319,7 +338,7 @@
         lastReviewed: null,
         timesSeen: 0,
         stage: 0,
-        nextReviewAt: nowIso
+        nextReviewAt: nowIso   // neue Karten sind sofort fällig
       });
     }
 
@@ -414,8 +433,8 @@
       if (deck.examDate) {
         const plan = computePlan(deck);
         if (plan) {
-          if (plan.daysLeft > 0 && plan.reviewsPerDay !== null) {
-            metaStr += ` • ${plan.daysLeft} Tage • ca. ${plan.reviewsPerDay} Wiederh./Tag`;
+          if (plan.daysLeft > 0 && plan.cardsPerDay !== null) {
+            metaStr += ` • ${plan.daysLeft} Tage • ca. ${plan.cardsPerDay} Karten/Tag`;
           } else if (plan.daysLeft <= 0) {
             metaStr += " • Klausurdatum erreicht/überschritten";
           }
@@ -474,8 +493,9 @@
     } else {
       planDiv.innerHTML =
         `Tage bis Klausur: <strong>${plan.daysLeft}</strong><br>` +
-        `Fehlende Wiederholungen bis Stufe 5: <strong>${plan.remainingReviews}</strong><br>` +
-        `Empfohlen: ca. <strong>${plan.reviewsPerDay}</strong> Wiederholungen/Tag.`;
+        `Aktive Karten (Stufe &lt; 5 inkl. neuer): <strong>${plan.activeCards}</strong><br>` +
+        `Empfohlen: ca. <strong>${plan.cardsPerDay}</strong> Karten/Tag<br>` +
+        `<span class="muted">Davon abgeleitet: ca. ${plan.reviewsPerDay} Wiederholungen/Tag bis Stufe 5.</span>`;
     }
 
     const badge = document.getElementById("card-count-badge");
@@ -664,6 +684,7 @@
     saveState();
   };
 
+  // TSV: neues Deck
   document.getElementById("btn-import").onclick = () => {
     const file = document.getElementById("file-import").files[0];
     if (!file) {
@@ -678,6 +699,7 @@
     reader.readAsText(file, "utf-8");
   };
 
+  // TSV: in bestehenden Stapel
   document.getElementById("btn-import-deck").onclick = () => {
     const deck = getDeck();
     if (!deck) {
@@ -693,6 +715,30 @@
     reader.onload = e => {
       importTSV_intoExistingDeck(e.target.result, deck);
       document.getElementById("file-import-deck").value = "";
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  // Backup: IMPORT
+  document.getElementById("btn-import-backup").onclick = () => {
+    const file = document.getElementById("file-backup").files[0];
+    if (!file) {
+      alert("Bitte eine Backup-Datei (JSON) auswählen.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        let data = JSON.parse(e.target.result);
+        data = normalizeState(data);
+        state = data;
+        saveState();
+        alert("Backup wurde erfolgreich importiert.");
+        document.getElementById("file-backup").value = "";
+      } catch (err) {
+        console.error(err);
+        alert("Backup konnte nicht gelesen werden. Ist es eine gültige JSON-Datei?");
+      }
     };
     reader.readAsText(file, "utf-8");
   };
@@ -726,7 +772,7 @@
       lastReviewed: null,
       timesSeen: 0,
       stage: 0,
-      nextReviewAt: nowIso
+      nextReviewAt: nowIso   // neue Karte sofort fällig
     });
     document.getElementById("new-card-front").value = "";
     document.getElementById("new-card-back").value = "";
@@ -791,6 +837,7 @@
     gotoNextCard();
   };
 
+  // Backup: EXPORT
   document.getElementById("btn-export").onclick = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -811,3 +858,4 @@
 
 </body>
 </html>
+
