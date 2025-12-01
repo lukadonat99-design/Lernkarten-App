@@ -107,7 +107,7 @@
 
   <h1>AM Lernkarten</h1>
   <p class="muted">
-    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel, 5-Minuten-Wiederholung bei Fehlern und TSV-Import.
+    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel, 5-Minuten-Wiederholung bei Fehlern und TSV-Import (inkl. Lecture-Spalte).
   </p>
 
   <!-- =========================
@@ -242,6 +242,7 @@
         deck.cards.forEach(c => {
           if (typeof c.stage === "undefined") c.stage = 0;
           if (!c.nextReviewAt) c.nextReviewAt = new Date().toISOString();
+          if (typeof c.lecture === "undefined") c.lecture = "";
         });
       });
 
@@ -287,7 +288,8 @@
   }
 
   /* ================================
-     TSV-Parsing (wiederverwendbar)
+     TSV-Parsing (mit Lecture-Spalte)
+     Front<TAB>Back<TAB>Lecture
   =================================*/
   function parseTSVToCards(text) {
     const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
@@ -307,11 +309,13 @@
       if (parts.length < 2) continue;
       const front = parts[0].trim();
       const back = parts[1].trim();
+      const lecture = parts.length > 2 ? parts[2].trim() : "";
       if (!front || !back) continue;
       cards.push({
         id: uuid(),
         front,
         back,
+        lecture,
         lastReviewed: null,
         timesSeen: 0,
         stage: 0,
@@ -491,9 +495,10 @@
           nextStr = d.toLocaleString("de-DE");
         }
       }
+      const lectureStr = c.lecture ? ` • Lecture: ${c.lecture}` : "";
       div.innerHTML =
         `<div><strong>${idx + 1}.</strong> ${c.front}</div>` +
-        `<div class="muted">Stufe: ${stage}/5 • Nächste Wiederholung: ${nextStr}</div>`;
+        `<div class="muted">Stufe: ${stage}/5 • Nächste Wiederholung: ${nextStr}${lectureStr}</div>`;
       list.appendChild(div);
     });
   }
@@ -516,7 +521,8 @@
 
     document.getElementById("study-progress").textContent =
       `Modus: ${study.mode === "plan" ? "Lernplan" : "Alle Karten"} • ` +
-      `Karte ${study.index + 1} von ${study.order.length} • Stufe ${card.stage || 0}/5`;
+      `Karte ${study.index + 1} von ${study.order.length} • Stufe ${card.stage || 0}/5` +
+      (card.lecture ? ` • Lecture: ${card.lecture}` : "");
 
     document.getElementById("study-face-label").textContent =
       study.showBack ? "Antwort" : "Frage";
@@ -716,6 +722,7 @@
       id: uuid(),
       front,
       back,
+      lecture: "",
       lastReviewed: null,
       timesSeen: 0,
       stage: 0,
