@@ -50,13 +50,16 @@
       color: #e5e7eb;
     }
     button.small { padding: .3rem .6rem; font-size: .8rem; }
-    input[type="text"], input[type="date"], textarea {
+    input[type="text"], input[type="date"], textarea, input[type="file"] {
       background: #020617;
       color: #e5e7eb;
       border: 1px solid #4b5563;
       border-radius: .5rem;
       padding: .5rem;
       font: inherit;
+    }
+    input[type="file"] {
+      padding: .3rem;
     }
     textarea {
       width: 100%;
@@ -104,7 +107,7 @@
 
   <h1>AM Lernkarten</h1>
   <p class="muted">
-    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel und 5-Minuten-Wiederholungen bei Fehlern.
+    Lerne deine Karteikarten für Additive Fertigung – mit Lernstufen, Klausur-Lernziel, 5-Minuten-Wiederholung bei Fehlern und TSV-Import.
   </p>
 
   <!-- =========================
@@ -122,10 +125,10 @@
       <button id="btn-add-deck">Anlegen</button>
     </div>
 
-    <!-- TSV Import -->
+    <!-- TSV Import (neues Deck) -->
     <div class="row mt-sm">
       <input id="file-import" type="file" accept=".tsv,.txt" />
-      <button id="btn-import" class="secondary small">TSV-Deck importieren</button>
+      <button id="btn-import" class="secondary small">TSV-Deck importieren (neuer Stapel)</button>
     </div>
 
     <div id="deck-list" class="mt-sm"></div>
@@ -153,7 +156,14 @@
     <h3 class="mt">
       Karten <span id="card-count-badge" class="badge"></span>
     </h3>
-    <div id="card-list"></div>
+
+    <!-- TSV Import in bestehenden Stapel -->
+    <div class="row mt-sm">
+      <input id="file-import-deck" type="file" accept=".tsv,.txt" />
+      <button id="btn-import-deck" class="secondary small">TSV in diesen Stapel importieren</button>
+    </div>
+
+    <div id="card-list" class="mt-sm"></div>
 
     <details class="mt">
       <summary>Karte hinzufügen</summary>
@@ -198,7 +208,6 @@
      JAVASCRIPT LOGIK
 ===============================================================-->
 <script>
-  // Speicher-Version hochgesetzt, damit alte Struktur sicher migriert wird
   const STORAGE_KEY = "am_flashcards_v3";
 
   let state = loadState();
@@ -229,7 +238,6 @@
       if (!raw) return { decks: [] };
       const s = JSON.parse(raw);
 
-      // Fallback für Karten ohne stage/nextReviewAt (alte Versionen)
       s.decks.forEach(deck => {
         deck.cards.forEach(c => {
           if (typeof c.stage === "undefined") c.stage = 0;
@@ -279,14 +287,11 @@
   }
 
   /* ================================
-     TSV-Import
+     TSV-Parsing (wiederverwendbar)
   =================================*/
-  function importTSV(text, filename) {
+  function parseTSVToCards(text) {
     const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-    if (lines.length === 0) {
-      alert("Die Datei ist leer.");
-      return;
-    }
+    if (!lines.length) return [];
 
     let start = 0;
     const header = lines[0].split("\t");
@@ -296,6 +301,7 @@
 
     const cards = [];
     const nowIso = new Date().toISOString();
+
     for (let i = start; i < lines.length; i++) {
       const parts = lines[i].split("\t");
       if (parts.length < 2) continue;
@@ -313,8 +319,13 @@
       });
     }
 
+    return cards;
+  }
+
+  function importTSV_asNewDeck(text, filename) {
+    const cards = parseTSVToCards(text);
     if (!cards.length) {
-      alert("Keine gültigen Karten gefunden.");
+      alert("Keine gültigen Karten in der TSV-Datei gefunden.");
       return;
     }
 
@@ -328,6 +339,18 @@
 
     saveState();
     alert(`Deck "${deckName}" importiert (${cards.length} Karten).`);
+  }
+
+  function importTSV_intoExistingDeck(text, deck) {
+    const cards = parseTSVToCards(text);
+    if (!cards.length) {
+      alert("Keine gültigen Karten in der TSV-Datei gefunden.");
+      return;
+    }
+
+    deck.cards.push(...cards);
+    saveState();
+    alert(`${cards.length} Karten wurden zu "${deck.name}" hinzugefügt.`);
   }
 
   /* ================================
@@ -482,7 +505,7 @@
     if (!study.order.length) {
       document.getElementById("study-progress").textContent =
         study.mode === "plan"
-          ? "Heute sind keine Karten laut Lernplan fällig."
+          ? "Aktuell sind keine Karten laut Lernplan fällig."
           : "Keine Karten im Stapel.";
       document.getElementById("study-text").textContent = "";
       return;
@@ -510,7 +533,6 @@
     if (stage < 5) stage += 1;
     card.stage = stage;
 
-    // Intervall in Tagen je Stufe
     let intervalDays;
     switch (stage) {
       case 1: intervalDays = 1; break;
@@ -536,7 +558,7 @@
   }
 
   function scheduleWrong(card, examDateStr) {
-    // Zurück auf Stufe 0, erneute Wiederholung nach 5 Minuten (heute)
+    // Zurück auf Stufe 0, Wiederholung nach 5 Minuten
     card.stage = 0;
 
     const now = new Date();
@@ -589,7 +611,6 @@
       indices = deck.cards.map((_, i) => i);
     }
 
-    // Shuffle
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -627,7 +648,6 @@
   document.getElementById("btn-add-deck").onclick = () => {
     const name = document.getElementById("new-deck-name").value.trim();
     if (!name) return;
-    const nowIso = new Date().toISOString();
     state.decks.push({
       id: uuid(),
       name,
@@ -646,8 +666,27 @@
     }
     const reader = new FileReader();
     reader.onload = e => {
-      importTSV(e.target.result, file.name);
+      importTSV_asNewDeck(e.target.result, file.name);
       document.getElementById("file-import").value = "";
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  document.getElementById("btn-import-deck").onclick = () => {
+    const deck = getDeck();
+    if (!deck) {
+      alert("Kein Stapel ausgewählt.");
+      return;
+    }
+    const file = document.getElementById("file-import-deck").files[0];
+    if (!file) {
+      alert("Bitte eine TSV-Datei auswählen.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      importTSV_intoExistingDeck(e.target.result, deck);
+      document.getElementById("file-import-deck").value = "";
     };
     reader.readAsText(file, "utf-8");
   };
@@ -765,4 +804,3 @@
 
 </body>
 </html>
-
